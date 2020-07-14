@@ -21,6 +21,17 @@ map_reads <- map_reads %>%
 map_gold <- map_reads %>%
 	filter(gold > 0)
 
+#Count the number of elements in each of the UMAPbins of map_gold
+UMAP_bins = map_gold %>% 
+	group_by(UMAPbin) %>% 
+	count()
+ggplot(data = UMAP_bins, aes(x = UMAPbin, y = n)) + geom_line() +
+	theme_classic() +
+	scale_x_continuous(breaks = seq(0,1,0.1), expand = c(0,0)) +
+	scale_y_log10(limits = c(1e3, 1e7), expand = c(0,0)) +
+	labs(x = "UMAP Score", y = "Number of Regions")
+rm(UMAP_bins)
+
 #Computing the mean of each read depth column binned by UMAP, then plotting
 reads_by_umap <- map_gold %>%
 	group_by(UMAPbin) %>%
@@ -32,6 +43,9 @@ ggplot(data = plot_reads_by_umap, aes(x = UMAPbin, y = value, color = variable))
 	scale_x_continuous(breaks = seq(0,1,0.1), expand = c(0,0)) + 
 	scale_y_continuous(limits = c(0, 50), expand = c(0,0)) +
 	labs(x = "Average UMAP Score", y = "Average Read Depth")
+
+#Keep my workspace clean!
+rm(reads_by_umap, plot_reads_by_umap)
 
 #Sorting each column of map_gold to generate a percentile plot (from gold_sub, with only ~6000 points so my GPU survives)
 gold_sort <- map_gold %>%
@@ -48,74 +62,94 @@ ggplot(data = plot_gold_sub, aes(x = ptile, y = value, color = variable)) + geom
 	scale_y_continuous(limits = c(0, 80), expand = c(0,0)) + 
 	labs(x = "Percentile", y = "Read Depth")
 
+#Keep my workspace clean!
+rm(gold_sub, plot_gold_sub)
+
 #Analyze excess read depth over map-1
 map_excess <- map_gold %>%
-	transmute(UMAP50, UMAPbin, i0sdiff = i0s - m1s, i1sdiff = i1s - m1s, i0udiff = i0u - m1u, i1udiff = i1u - m1u)
-
+	transmute(UMAPbin, i0sdiff = i0s - m1s, i1sdiff = i1s - m1s,
+		i0udiff = i0u - m1u, i1udiff = i1u - m1u)
 map_excess_by_umap <- map_excess %>%
 	group_by(UMAPbin) %>%
-	summarise_at(vars(2:5), mean)
+	summarise_all(mean)
+plot_excess_rbu <- map_excess_by_umap %>%
+	gather(variable, value, -UMAPbin)
+ggplot(data = plot_excess_rbu, aes(x = UMAPbin, y = value, color = variable)) + geom_line() + 
+	theme_classic() +
+	scale_x_continuous(breaks = seq(0,1,0.1), expand = c(0,0)) +
+	scale_y_continuous(expand = c(0,0)) +
+	labs(x = "Average UMAP Score", y = "Excess Read Depth")
 
-plot_excess_rbu <- melt(map_excess_by_umap, id.vars = "UMAPbin")
-plot_excess_rbu$UMAP <- as.numeric(levels(plot_excess_rbu$UMAPbin))[plot_excess_rbu$UMAPbin]
-ggplot(data = plot_excess_rbu, aes(x = UMAP, y = value, color = variable)) + theme_classic() + geom_line() +
-	scale_x_continuous(breaks = seq(0,1,0.1), expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
-	labs(xaxis = "Average UMAP Score", yaxis = "Excess Read Depth")
+#Keep my workspace clean!
+rm(map_excess_by_umap, plot_excess_rbu)
 
-map_excess_sorted <- map_excess %>% select(i0sdiff:i1udiff) %>% mutate_each(list(~sort))
-excess_sub <- map_excess_sorted %>% mutate(ptile = row_number()/length(i0sdiff)*100) %>% filter(row_number() %% 1000 == 0)
+#Sorting each column to generate a percentile plot of excesses
+map_excess_sorted <- map_excess %>% 
+	select(i0sdiff:i1udiff) %>% 
+	mutate_each(list(~sort))
+excess_sub <- map_excess_sorted %>%
+	mutate(ptile = row_number()/length(i0sdiff)*100) %>%
+	filter(row_number() %% 1000 == 0)
+plot_excess_ptile <- excess_sub %>%
+	gather(variable, value, -ptile)
+ggplot(data = plot_excess_ptile, aes(x = ptile, y = value, color = variable)) + geom_line() +
+	theme_classic() + 
+	scale_x_continuous(limits = c(0, 100), expand = c(0,0)) + 
+	scale_y_continuous(limits = c(0, 60), expand = c(0,0)) +
+	labs(x = "Percentile", y = "Excess Read Depth")
 
-plot_excess_ptile <- melt(excess_sub, id.vars = "ptile")
-ggplot(data = plot_excess_ptile, aes(x = ptile, y = value, color = variable)) + theme_classic() + geom_line() +
-	scale_x_continuous(expand = c(0,0)) + 
-	scale_y_continuous(limits = c(0, 60), expand = c(0,0))
+#Keep my workspace clean!
+rm(excess_sub, plot_excess_ptile)
 
-UMAP_bins = map_gold %>% group_by(UMAPbin) %>% count()
-UMAP_bins$UMAPbin = as.numeric(levels(UMAP_bins$UMAPbin))[UMAP_bins$UMAPbin]
-ggplot(data = UMAP_bins, aes(x = UMAPbin, y = n)) + geom_line() + theme_classic() + scale_y_log10()
+#Define the color palette that I'll be using so I don't have to keep dealing with it.
+scl_pal <- wes_palette("Zissou1", type="continuous")
 
-plt_gold = gold_sort %>% filter(row_number() %% 28540 == 0) %>% mutate(ptile = seq(0.5, 99.5, 0.5))
-ggplot(data = plt_gold, aes(x = m1s, y = i0s, color = ptile)) + geom_point() + 
-	scale_color_gradientn(colors = wes_palette("Zissou1", 100, type="continuous"), name = "Percentile", limits = c(0, 100), position = "left") + 
-	theme_classic() + scale_x_continuous(limits = c(0, 70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	scale_y_continuous(limits = c(0,70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+#Generate several qq plots of different samples
+plt_gold = gold_sort %>%
+	filter(row_number() %% ceiling(length(gold)/100) == 0) %>%
+	mutate(ptile = 1:99)
+
+#QQ plot of Map 1 scored vs Iteration 1 Scored
+ggplot(data = plt_gold, aes(x = m1s, y = i1s, color = ptile)) + geom_point() + geom_line() + 
+	theme_classic() + geom_abline(slope = 1) +
 	theme(text = element_text(size = 10), legend.position = c(0.05, 0.95), legend.justification = c("left", "top")) + 
-	labs(x = "Map 1 Scored", y = "Iteration 1 Scored") + geom_abline(slope = 1)
+	scale_color_gradientn(colors = scl_pal, name = "Percentile", limits = c(0, 100), position = "left") + 
+	scale_x_continuous(limits = c(0, 60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+	scale_y_continuous(limits = c(0,60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+	labs(x = "Map 1 Scored", y = "Iteration 1 Scored") 
 ggsave(filename = "QQ-M1S-I1S.eps", width = 3, height = 3, units = "in")
 
-ggplot(data = plt_gold, aes(x = i1s, y = gold, color = ptile)) + geom_point() + 
-	scale_color_gradientn(colors = wes_palette("Zissou1", 100, type="continuous"), name = "Percentile", limits = c(0, 100), position = "left") + 
-	theme_classic() + scale_x_continuous(limits = c(0, 70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	scale_y_continuous(limits = c(0,70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+#QQ Plot of Iteration 1 scored vs golden
+ggplot(data = plt_gold, aes(x = i1s, y = gold, color = ptile)) + geom_point() + geom_line() + 
+	theme_classic() + geom_abline(slope = 1) +
 	theme(text = element_text(size = 10), legend.position = c(0.05, 0.95), legend.justification = c("left", "top")) + 
-	labs(x = "Iteration 1 Scored", y = "Golden") + geom_abline(slope = 1)
+	scale_color_gradientn(colors = scl_pal, name = "Percentile", limits = c(0, 100), position = "left") + 
+	scale_x_continuous(limits = c(0, 60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+	scale_y_continuous(limits = c(0,60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+	labs(x = "Iteration 1 Scored", y = "Golden") 
 ggsave(filename = "QQ-I1S-Golden.eps", width = 3, height = 3, units = "in")
 
-ggplot(data = plt_gold, aes(x = m1s, y = gold, color = ptile)) + geom_point() + 
-	scale_color_gradientn(colors = wes_palette("Zissou1", 100, type="continuous"), name = "Percentile", limits = c(0, 100), position = "left") + 
-	theme_classic() + scale_x_continuous(limits = c(0, 70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	scale_y_continuous(limits = c(0,70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+#QQ Plot of Map 1 scored vs golden
+ggplot(data = plt_gold, aes(x = m1s, y = gold, color = ptile)) + geom_point() + geom_line() + 
+	theme_classic() + geom_abline(slope = 1) +
 	theme(text = element_text(size = 10), legend.position = c(0.05, 0.95), legend.justification = c("left", "top")) + 
-	labs(x = "Map 1 Scored", y = "Golden") + geom_abline(slope = 1)
+	scale_color_gradientn(colors = scl_pal, name = "Percentile", limits = c(0, 100), position = "left") + 
+	scale_x_continuous(limits = c(0, 60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+	scale_y_continuous(limits = c(0,60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
+	labs(x = "Map 1 Scored", y = "Golden") 
 ggsave(filename = "QQ-M1S-Golden.eps", width = 3, height = 3, units = "in")
 
-ggplot(data = plt_gold, aes(x = i0s, y = gold, color = ptile)) + geom_point() + 
-	scale_color_gradientn(colors = wes_palette("Zissou1", 100, type="continuous"), name = "Percentile", limits = c(0, 100), position = "left") + 
-	theme_classic() + scale_x_continuous(limits = c(0, 70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	scale_y_continuous(limits = c(0,70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	theme(text = element_text(size = 10), legend.position = c(0.05, 0.95), legend.justification = c("left", "top")) + 
-	labs(x = "Iteration 0 Scored", y = "Golden") + geom_abline(slope = 1)
+#Keep my workspace clean!
+rm(plt_gold)
 
-ggplot(data = plt_gold, aes(x = i1u, y = i1s, color = ptile)) + geom_point() + 
-	scale_color_gradientn(colors = wes_palette("Zissou1", 100, type="continuous"), name = "Percentile", limits = c(0, 100), position = "left") + 
-	theme_classic() + scale_x_continuous(limits = c(0, 70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	scale_y_continuous(limits = c(0,70), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-	theme(text = element_text(size = 10), legend.position = c(0.05, 0.95), legend.justification = c("left", "top")) + 
-	labs(x = "Iteration 0 Scored", y = "Iteration 1 Scored") + geom_abline(slope = 1)
-
-mae_by_UMAP = map_gold %>% group_by(UMAPbin) %>% transmute_at(vars(i0s:m1u), ~abs(.-gold)) %>% summarize_all(mean)
-plot_mae_umap <- melt(mae_by_UMAP, id.vars = "UMAPbin")
-plot_mae_umap$UMAP <- seq(0, 1, 0.01)
-ggplot(data = plot_mae_umap, aes(x = UMAP, y = value, color = variable)) + theme_classic() + geom_line() +
+#Generate plots of mean absolute error by UMAP
+mae_by_UMAP = map_gold %>%
+	group_by(UMAPbin) %>%
+	transmute_at(vars(i0s:m1u), ~abs(.-gold)) %>%
+	summarize_all(mean)
+plot_mae_umap <- mae_by_UMAP %>%
+	gather(variable, value, -UMAPbin)
+ggplot(data = plot_mae_umap, aes(x = UMAPbin, y = value, color = variable)) + theme_classic() + geom_line() +
 	scale_x_continuous(breaks = seq(0,1,0.1), expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
 	labs(xaxis = "Average UMAP Score", yaxis = "Excess Read Depth")
+rm(mae_by_UMAP, plot_mae_umap)
