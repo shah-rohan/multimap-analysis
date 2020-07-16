@@ -2,4 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
-hg38_6mil_200bp_ID_UMAP50_golden_iter0-scored-unscored_iter1-scored-unscored_map1-scored-unscored.tab
+*.tab
+*.eps
