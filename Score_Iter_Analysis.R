@@ -153,3 +153,8 @@ ggplot(data = plot_mae_umap, aes(x = UMAPbin, y = value, color = variable)) + th
 	scale_x_continuous(breaks = seq(0,1,0.1), expand = c(0,0)) + scale_y_continuous(expand = c(0,0)) +
 	labs(xaxis = "Average UMAP Score", yaxis = "Excess Read Depth")
 rm(mae_by_UMAP, plot_mae_umap)
+
+dens = density(map_gold$UMAP50, adjust = 2, from=0, to = 1, n = 200, bw = "nrd")
+dens2 = as.data.frame(dens$x) %>% bind_cols(as.data.frame(dens$y))
+colnames(dens2) = c("x", "y")
+ggplot(dens2, aes(x = x, y = y)) + geom_line() + scale_y_log10()
