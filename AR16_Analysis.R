@@ -26,6 +26,12 @@ ggplot(data = UMAP_bins, aes(x = UMAPbin, y = n)) + geom_line() +
 	scale_y_log10(limits = c(1e3, 1e8), expand = c(0,0), breaks = c(1e3, 1e4, 1e5, 1e6, 1e7, 1e8)) +
 	labs(x = "UMAP Score", y = "Number of Windows")
 
+#Binning density plot -- more rigorous, I suppose.
+hg_dens = density(hg_UMAP_binned$UMAP50, from = 0, to = 1, bw = "nrd", n = 200)
+hg_dens2 = as.data.frame(dens$x) %>% bind_cols(as.data.frame(dens$y))
+colnames(hg_dens2) = c("x", "y")
+ggplot(hg_dens2, aes(x = x, y = y)) + geom_line() + scale_y_log10()
+
 #Create UMAP proportion plot
 UMAP_prop = UMAP_bins %>%
 	mutate(n = n/sum(n))
@@ -56,6 +62,7 @@ ggplot(data = plt_AR16_in_sort_sub, aes(x = ptile, y = value, color = variable))
 
 rm(AR16_in_sort_sub, plt_AR16_in_sort_sub)
 
+#Read depth by UMAP score
 AR16_UMAP_Input = hg_UMAP_binned %>% select(UMAP50, UMAPbin) %>% bind_cols(AR16_Input)
 AR16_Input_UMAPbinned = AR16_UMAP_Input %>%
 	group_by(UMAPbin) %>%
@@ -74,3 +81,8 @@ ggplot(data = AR16_reads_by_umap, aes(x = UMAPbin, y = value, color = variable))
 	labs(x = "Average UMAP Score", y = "Average Read Depth")
 
 rm(AR16_Input_UMAPbinned, AR16_Input_UB_ci, AR16_Input_shade, AR16_reads_by_umap)
+
+AR16_Input_excess  = AR16_UMAP_Input %>%
+	transmute(UMAP50, UMAPbin, excess = II-IM)
+AR16_excess_sorted = AR16_Input_excess %>%
+	mutate_each(list(~sort(.)))
