@@ -8,26 +8,36 @@ scl_pal <- wes_palette("Zissou1", type="continuous")
 #Read in the files for the datasets
 AR7 = read.table("data/AR7_mESC_windows_H3K4me3-S1-S2-Input-S1-S2_iter1-map1.tab")
 colnames(AR7) = c("chr", "start", "stop", "K4R1I", "K4R1M", "K4R2I", "K4R2M", "IR1I", "IR1M", "IR2I", "IR2M")
+AR7_cals = AR7 %>%
+	filter(row_number() <= 11)
 AR7 = AR7 %>%
 	filter(row_number() > 11)
 
 AR8 = read.table("data/AR8_S2_windows_H3K27me3-Input_iter1-map1.tab")
 colnames(AR8) = c("chr", "start", "stop", "K27I", "K27M", "II", "IM")
+AR8_cals = AR8 %>%
+	filter(row_number() <= 100)
 AR8 = AR8 %>%
 	filter(row_number() > 100)
 
 AR9 = read.table("data/AR9_mESC_windows_H3K4me3-H3K9me3-H3K27me3-Input_iter1-map1.tab")
 colnames(AR9) = c("chr", "start", "stop", "K4I", "K4M", "K9I", "K9M", "K27I", "K27M", "II", "IM")
+AR9_cals = AR9 %>%
+	filter(row_number() <= 100)
 AR9 = AR9 %>%
 	filter(row_number() > 100)
 
 AR16 = read.table("data/AR16_K562_windows_H3K4me1-2-3-Input_iter1-map1.tab")
 colnames(AR16) = c("chr", "start", "stop", "me1I", "me1M", "me2I", "me2M", "me3I", "me3M", "II", "IM")
+AR16_cals = AR16 %>%
+	filter(row_number() <= 136)
 AR16 = AR16 %>% 
 	filter(row_number() > 136)
 
 AR17 = read.table("data/AR17_K562_windows_counts_H3K27me3-H3K9me3-Input_iter-map.tab")
 colnames(AR17) = c("chr", "start", "stop", "K27I", "K27M", "K9I", "K9M", "II", "IM")
+AR17_cals = AR17 %>%
+	filter(row_number() <= 136)
 AR17 = AR17 %>%
 	filter(row_number() > 136)
 
@@ -182,7 +192,7 @@ ratio_analysis <- function(input1, input2, reads_input1, reads_input2, filename)
 		abs %>%
 		colMeans
 	print(mae)
-#	write.table(Input_diff, filename, sep = "\t", quote = F, row.names = F, col.names = T)
+	write.table(Input_diff, filename, sep = "\t", quote = F, row.names = F, col.names = T)
 }
 
 ratio_analysis(AR7$IR1I, AR7$IR2I, 396109479, 387757427, "processed/AR7_Input_R2-AR7_Input_R1_multimap_logratio.tab")
@@ -193,3 +203,5 @@ ratio_analysis(AR7$IR2I, AR9$II, 387757427, 620463606, "processed/AR9_Input-AR7_
 ratio_analysis(AR7$IR2M, AR9$IM, 304127899, 488503092, "processed/AR9_Input-AR7_Input_R2_uniread_logratio.tab")
 ratio_analysis(AR16$II, AR17$II, 342591891, 305008807, "processed/AR17_Input-AR16_Input_multimap_logratio.tab")
 ratio_analysis(AR16$IM, AR17$IM, 285996344, 256373920, "processed/AR17_Input-AR16_Input_uniread_logratio.tab")
+
+#To this point, the calibrants were ignored. Now, I need to review them and normalize with them.
