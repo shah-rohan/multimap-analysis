@@ -156,7 +156,7 @@ input_analysis <- function(iter1, map1, umapbins, prefix){
 		scale_color_gradientn(colors = scl_pal, name = "Percentile", limits = c(0, 100), position = "left") + 
 		scale_x_continuous(limits = c(0, 60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
 		scale_y_continuous(limits = c(0,60), expand = c(0,0), breaks = seq(0, 70, 10)) + 
-		labs(x = "Map 1 Scored", y = "Iteration 1 Scored")
+		labs(x = "Uniread Scored", y = "Multimap Scored")
 	print(qq_plt)
 }
 
@@ -166,3 +166,30 @@ input_analysis(AR8$II, AR8$IM, dm_UMAP$UMAPbin, "processed/AR8_Input")
 input_analysis(AR9$II, AR9$IM, mm_UMAP$UMAPbin, "processed/AR9_Input")
 input_analysis(AR16$II, AR16$IM, hg_UMAP$UMAPbin, "processed/AR16_Input")
 input_analysis(AR17$II, AR17$IM, hg_UMAP$UMAPbin, "processed/AR17_Input")
+
+ratio_analysis <- function(input1, input2, reads_input1, reads_input2, filename) {
+	Input_ratio = bind_cols(as.data.frame(input1), as.data.frame(input2))
+	colnames(Input_ratio) = c("In1", "In2")
+	Input_diff = Input_ratio %>%
+		filter(In1>0 & In2>0) %>%
+		mutate_each(list(~log10(.))) %>%
+		transmute(dif = In2-In1 - log10(reads_input2/reads_input1)) %>%
+		arrange(dif) %>%
+		mutate(ptile = row_number()/length(dif)*100) %>%
+		filter(row_number() %% ceiling(length(dif)/6000) == 0)
+	mae = Input_diff %>%
+		select(dif) %>%
+		abs %>%
+		colMeans
+	print(mae)
+#	write.table(Input_diff, filename, sep = "\t", quote = F, row.names = F, col.names = T)
+}
+
+ratio_analysis(AR7$IR1I, AR7$IR2I, 396109479, 387757427, "processed/AR7_Input_R2-AR7_Input_R1_multimap_logratio.tab")
+ratio_analysis(AR7$IR1M, AR7$IR2M, 311090692, 304127899, "processed/AR7_Input_R2-AR7_Input_R1_uniread_logratio.tab")
+ratio_analysis(AR7$IR1I, AR9$II, 396109479, 620463606, "processed/AR9_Input-AR7_Input_R1_multimap_logratio.tab")
+ratio_analysis(AR7$IR1M, AR9$IM, 311090692, 488503092, "processed/AR9_Input-AR7_Input_R1_uniread_logratio.tab")
+ratio_analysis(AR7$IR2I, AR9$II, 387757427, 620463606, "processed/AR9_Input-AR7_Input_R2_multimap_logratio.tab")
+ratio_analysis(AR7$IR2M, AR9$IM, 304127899, 488503092, "processed/AR9_Input-AR7_Input_R2_uniread_logratio.tab")
+ratio_analysis(AR16$II, AR17$II, 342591891, 305008807, "processed/AR17_Input-AR16_Input_multimap_logratio.tab")
+ratio_analysis(AR16$IM, AR17$IM, 285996344, 256373920, "processed/AR17_Input-AR16_Input_uniread_logratio.tab")
