@@ -41,6 +41,14 @@ AR17_cals = AR17 %>%
 AR17 = AR17 %>%
 	filter(row_number() > 136)
 
+AR16_single = read.table("data/AR16_K562_Input_single-end_iter-map.windows.tab")
+AR16_single = AR16_single %>%
+	filter(row_number() > 136)
+
+AR17_single = read.table("data/AR17_K562_Input_single-end_iter-map.windows.tab")
+AR17_single = AR17_single %>%
+	filter(row_number() > 136)
+
 #Load in the genome-wide UMAP files
 hg_UMAP = read.table("UMAPS/hg38_UMAP50_windows.tab")
 colnames(hg_UMAP) = c("chr", "start", "stop", "UMAP50")
