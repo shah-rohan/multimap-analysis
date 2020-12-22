@@ -5,7 +5,7 @@ library(tidyr)
 library(wesanderson)
 
 #Loading the interval read depth data, selecting just the read depths, and then removing the full data to save RAM
-full_data <- read.table("hg38_6mil_200bp_ID_UMAP50_golden_iter0-scored-unscored_iter1-scored-unscored_map1-scored-unscored.tab")
+full_data <- read.table("data/hg38_6mil_200bp_ID_UMAP50_golden_iter0-iter1-map1_scored-unscored.tab")
 map_reads <- subset(full_data, select = 5:12)
 colnames(map_reads) = c("UMAP50", "gold", "i0s", "i0u", "i1s", "i1u", "m1s", "m1u")
 rm(full_data)
@@ -158,3 +158,11 @@ dens = density(map_gold$UMAP50, adjust = 2, from=0, to = 1, n = 200, bw = "nrd")
 dens2 = as.data.frame(dens$x) %>% bind_cols(as.data.frame(dens$y))
 colnames(dens2) = c("x", "y")
 ggplot(dens2, aes(x = x, y = y)) + geom_line() + scale_y_log10()
+
+#Compute Mean absolute error stratified by golden read depth
+print(map_reads %>% select(gold:m1u) %>% mutate(across(-1, ~abs((.-gold)/mean(gold)))) %>% summarize_all(mean))
+print(map_reads %>% select(gold:m1u) %>% filter(gold < 30) %>% mutate(across(-1, ~abs((.-gold)/mean(gold)))) %>% summarize_all(mean))
+print(map_reads %>% select(gold:m1u) %>% filter(gold < 40 & gold >=30) %>% mutate(across(-1, ~abs((.-gold)/mean(gold)))) %>% summarize_all(mean))
+print(map_reads %>% select(gold:m1u) %>% filter(gold < 50 & gold >=40) %>% mutate(across(-1, ~abs((.-gold)/mean(gold)))) %>% summarize_all(mean))
+print(map_reads %>% select(gold:m1u) %>% filter(gold < 60 & gold >=50) %>% mutate(across(-1, ~abs((.-gold)/mean(gold)))) %>% summarize_all(mean))
+print(map_reads %>% select(gold:m1u) %>% filter(gold >= 60) %>% mutate(across(-1, ~abs((.-gold)/mean(gold)))) %>% summarize_all(mean))
